@@ -27,6 +27,17 @@ math: true              # load KaTeX on this page
 # toc: false                     # hide the table of contents
 ```
 
+### Writing in Overleaf
+
+`examples/overleaf-post/` is a starter project that compiles in Overleaf and builds on the site.
+
+1. Zip it (`cd examples/overleaf-post && zip -r ../overleaf-post.zip .`), then in Overleaf:
+   **New Project → Upload Project**, main document `index.tex`, compiler pdfLaTeX.
+2. Write. Keep the title, date, category, and summary in `meta.yaml`
+   (the site ignores `\title` and the abstract). Figures go in `figs/` as PNG/JPG/PDF.
+3. To publish: **Menu → Download → Source**, unzip into `posts/<yyyy-mm-short-name>/`,
+   remove `draft: true` from `meta.yaml`, then commit and push.
+
 Shared macros (`\dd`, `\dv`, `\pdv`, `\tr`, `\slashed`) live in `macros.tex`.
 Equations, figures, and sections are numbered across the whole post by `tools/crossref.lua`.
 

@@ -142,6 +142,14 @@ main.wide { max-width: calc(var(--w-wide) + 2.5rem); }
 .katex { font-size: 1.05em; }
 .post-body img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 figure { margin: 2.2rem 0; }
+/* LaTeX minipages inside a figure: side by side (pandoc drops the widths; tables get more room) */
+figure:has(> .minipage) { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-start; }
+figure > .minipage { flex: 1 1 0; min-width: 0; text-align: center; }
+figure > .minipage:has(table) { flex-grow: 3; text-align: left; }
+figure > .minipage > p { margin: 0; font-size: .9rem; }
+figure > .minipage table { font-size: .85rem; margin: 0; }
+figure > figcaption { flex-basis: 100%; }
+@media (max-width: 640px) { figure > .minipage { flex-basis: 100%; } }
 figcaption { color: var(--muted); font-size: .88rem; margin-top: .8rem; text-align: center; }
 figcaption strong { color: var(--text); font-weight: 600; }
 table { border-collapse: collapse; margin: 1.6rem auto; font-size: .92rem; display: block; overflow-x: auto; width: fit-content; max-width: 100%; }
@@ -194,3 +202,9 @@ code span.al, code span.er { color: #c0392b; }
 @media (prefers-reduced-motion: reduce) {
   body, .panel, .cards { transition: none; }
 }
+
+/* LaTeX \colorbox / \textcolor spans */
+.post-body span[style*="background-color"] { padding: 0 .2em; border-radius: 3px; }
+:root[data-theme="dark"] .post-body span[style*="background-color"] { color: #1b1d22; }
+figure > .minipage img { width: 100%; }
+:root:not([data-theme="dark"]) figure img { mix-blend-mode: multiply; }

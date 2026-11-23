@@ -1,0 +1,8 @@
+title: "The Damped Harmonic Oscillator"
+date: 2026-12-01
+category: Physics          # AI | Physics
+tags: [classical-mechanics, ODE]
+summary: "One-sentence summary shown on the home page, in feeds, and in link previews."
+math: true
+draft: true                # remove this line when the post is ready to publish
+# code: https://github.com/galaxygliese/...   # optional "Code on GitHub" link

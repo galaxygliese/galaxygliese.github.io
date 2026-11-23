@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import html
 import re
 import shutil
@@ -106,11 +107,76 @@ def tag_html(category: str) -> str:
     return f'<a class="cat cat-{slug}" href="/{slug}/">{esc(category)}</a>'
 
 
+def image_size(path: Path) -> tuple[int, int] | None:
+    """(width, height) of a PNG / JPEG / GIF / SVG, read from the header (no Pillow needed)."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return int.from_bytes(data[6:8], "little"), int.from_bytes(data[8:10], "little")
+    if data[:2] == b"\xff\xd8":                                  # JPEG: find the SOFn marker
+        i = 2
+        while i + 9 < len(data):
+            if data[i] != 0xFF:
+                i += 1; continue
+            marker, seglen = data[i + 1], int.from_bytes(data[i + 2:i + 4], "big")
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                return int.from_bytes(data[i + 7:i + 9], "big"), int.from_bytes(data[i + 5:i + 7], "big")
+            i += 2 + seglen
+        return None
+    if path.suffix == ".svg":
+        m = re.search(rb'viewBox="[\d.\s-]+?\s([\d.]+)\s+([\d.]+)"', data[:2000]) \
+            or re.search(rb'<svg[^>]*?width="([\d.]+)[^"]*"[^>]*?height="([\d.]+)', data[:2000])
+        return (float(m.group(1)), float(m.group(2))) if m else None
+    return None
+
+
+def equal_height_minipages(body: str, src: Path) -> str:
+    """Side-by-side image minipages: flex-grow = aspect ratio, so every image in a row
+    ends up the same height (like matching LaTeX subfigures)."""
+    def aspect(div: str) -> float | None:
+        img = re.search(r'<img [^>]*src="([^"]+)"', div)
+        if "<table" in div or not img or img.group(1).startswith(("http:", "https:", "data:")):
+            return None
+        size = image_size(src / img.group(1))
+        return size[0] / size[1] if size and size[1] else None
+
+    def fix(fig: re.Match) -> str:
+        html_ = fig.group(0)
+        divs = re.findall(r'<div class="minipage">.*?</div>', html_, flags=re.S)
+        ratios = [aspect(d) for d in divs]
+        if len(divs) < 2 or None in ratios:        # only rows made purely of images
+            return html_
+        for d, r in zip(divs, ratios):
+            html_ = html_.replace(d, d.replace('<div class="minipage">',
+                                               f'<div class="minipage" style="flex-grow: {r:.4f}">', 1), 1)
+        return html_
+    return re.sub(r"<figure\b.*?</figure>", fix, body, flags=re.S)
+
+
+_katex_flag = None
+def katex_flag() -> str:
+    """--katex is deprecated in newer pandoc (warns -> fails --strict); --math-method is unknown in old ones."""
+    global _katex_flag
+    if _katex_flag is None:
+        out = subprocess.run(["pandoc", "--version"], capture_output=True, text=True).stdout
+        ver = tuple(int(x) for x in re.search(r"pandoc\S* (\d+)\.(\d+)", out).groups())
+        _katex_flag = "--math-method=katex" if ver >= (3, 10) else "--katex"
+    return _katex_flag
+
+
 # ---------------------------------------------------------------- page shell
 class Site:
     def __init__(self, cfg: dict, katex_base: str):
         self.cfg = cfg
         self.base = load_template("base.html")
+        # cache-busting: /static/css/style.css -> /static/css/style.css?v=<content hash>
+        for asset in ("css/style.css", "js/gravity.js"):
+            v = hashlib.sha1((ROOT / "static" / asset).read_bytes()).hexdigest()[:8]
+            self.base = self.base.replace(f"/static/{asset}\"", f"/static/{asset}?v={v}\"")
         self.katex_base = katex_base
         self.url = cfg.get("url", "").rstrip("/")
 
@@ -166,7 +232,7 @@ def build_post(site: Site, src: Path) -> dict | None:
         raise SystemExit(f"{src}/meta.yaml: category must be one of {list(CATEGORIES)}")
 
     args = [str(ROOT / "macros.tex"), "index.tex", "--from", "latex", "--to", "html5",
-            "--katex", "--lua-filter", str(ROOT / "tools" / "crossref.lua"),
+            katex_flag(), "--lua-filter", str(ROOT / "tools" / "crossref.lua"),
             "--template", str(TEMPLATES / "post.html"),
             "--syntax-highlighting", "pygments",  # token classes only; colours live in style.css
             "--section-divs"]
@@ -176,6 +242,7 @@ def build_post(site: Site, src: Path) -> dict | None:
         args += ["--citeproc", "--bibliography", "refs.bib",
                  "--metadata", "reference-section-title=References", "--metadata", "link-citations=true"]
     body = run_pandoc(args, cwd=src)
+    body = equal_height_minipages(body, src)
     body = re.sub(r"<img (?![^>]*loading=)", '<img loading="lazy" decoding="async" ', body)
 
     slug = src.name
@@ -208,9 +275,11 @@ def build_post(site: Site, src: Path) -> dict | None:
               nav=CATEGORIES[meta["category"]], og_type="article", og_image=og_image,
               math=bool(meta.get("math", has_math)), wide=True)
 
-    # copy assets (figures, data, ...) next to the page, except sources
+    # copy assets (figures, data, ...) that the page links to; skip sources and unused files
     for f in src.rglob("*"):
-        if f.is_file() and f.suffix not in {".tex", ".bib", ".yaml", ".aux", ".log"}:
+        rel = f.relative_to(src).as_posix()
+        if f.is_file() and f.suffix not in {".tex", ".bib", ".yaml", ".aux", ".log"} \
+                and (f'"{rel}"' in content or rel == image):
             dest = OUT / "posts" / slug / f.relative_to(src)
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, dest)

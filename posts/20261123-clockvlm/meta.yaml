@@ -1,0 +1,8 @@
+title: "Teaching a VLM to Read Analog Clocks: SFT and GRPO"
+date: 2026-11-23
+category: AI          # AI | Physics
+tags: [vlm, sft, gpro]
+summary: "Even recent VLMs are reportedly still not very accurate at reading analog clocks in real-world images. I therefore examined how SFT and SFT + GRPO affect VLM performance on this task."
+math: true
+publish: true
+code: https://github.com/galaxygliese/VLM-SFT-GPRO-Clock
