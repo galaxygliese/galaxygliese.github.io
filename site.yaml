@@ -1,0 +1,12 @@
+# Site-wide settings (simple "key: value" YAML, one per line)
+title: "galaxygliese"
+author: "Sodtavilan Odonchimed"
+description: "My notes on machine learning and physics."
+url: "https://galaxygliese.github.io"
+repo: "https://github.com/galaxygliese/galaxygliese.github.io"
+email: "o.sodoo2019@gmail.com"
+github: "https://github.com/galaxygliese"
+linkedin: "https://www.linkedin.com/in/sodtavilan-odonchimed-9b80981a9"
+scholar: ""                       # TODO: Google Scholar profile URL
+cv: ""                            # TODO: e.g. /static/cv.pdf
+intro: "My notes on <strong>machine learning</strong> and <strong>physics</strong>"

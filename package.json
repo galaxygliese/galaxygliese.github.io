@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Build-time helper: self-hosted KaTeX assets + equation validation",
+  "dependencies": {
+    "katex": "0.16.25"
+  }
+}
